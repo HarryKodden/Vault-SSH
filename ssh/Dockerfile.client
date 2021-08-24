@@ -1,0 +1,26 @@
+FROM bitnami/minideb 
+
+ENV TERM xterm-256color
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USER=user
+
+# INSTALL GENERIC...
+RUN apt-get clean
+RUN apt-get update 
+RUN apt-get update && apt-get install -y ntp curl unzip ssh sshpass iputils-ping sudo vim
+
+# INSTALL VAULT...
+ENV VAULT_VERSION=1.8.1
+RUN curl -C - -k https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip -o /tmp/vault.zip
+RUN unzip -d /tmp/ /tmp/vault.zip && rm /tmp/vault.zip
+RUN mv /tmp/vault /usr/local/bin/
+
+# SETUP USER...
+RUN useradd -m ${USER} --shell /bin/bash \
+    && usermod -aG sudo ${USER} \
+    && echo "${USER} ALL=NOPASSWD: ALL" >> /etc/sudoers
+WORKDIR /home/${USER}
+USER ${USER}
+
+CMD ["/bin/bash"]
+

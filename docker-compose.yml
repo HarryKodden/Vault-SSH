@@ -1,0 +1,77 @@
+# docker-compose.yml
+
+version: '3'
+
+services:
+
+  vault:
+    image: vault:latest
+    environment:
+      VAULT_ADDR: http://localhost:8200
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-test_token}
+    ports:
+      - 8200:8200
+    cap_add:
+      - IPC_LOCK
+    command: vault server -dev -dev-no-store-token=true -log-level=debug -dev-listen-address=0.0.0.0:8200
+
+  ssh_server:
+    build:
+      context: ssh
+      dockerfile: Dockerfile.server
+    hostname: ssh_server
+    environment:
+      VAULT_ADDR: http://vault:8200
+    volumes:
+      - "./etc/config.hcl:/etc/vault-ssh-helper.d/config.hcl"
+    links:
+      - vault
+    command:
+      - /bin/bash
+      - -c
+      - |
+        sleep 15
+        echo "Starting SSH Server..."
+        curl $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
+        /usr/sbin/sshd -D   
+
+  ssh_client:
+    build:
+      context: ssh
+      dockerfile: Dockerfile.client
+    hostname: ssh_client
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:-test_token}
+    volumes:
+      - "./etc/user-role.json:/etc/user-role.json"
+    links:
+      - vault
+      - ssh_server
+    command:
+      - /bin/bash
+      - -c
+      - |
+        sleep 5
+        echo "Starting SSH Client..."
+        #
+        export SSH_SERVER=$$(getent hosts ssh_server | awk '{ print $$1 }')
+        #
+        vault secrets enable ssh
+        #
+        # SSH OTP Method...
+        #
+        vault write ssh/roles/otp_key_role key_type=otp default_user=user cidr_list=0.0.0.0/0
+        vault write ssh/creds/otp_key_role ip=$${SSH_SERVER}
+        echo 'alias ssh_server_otp="vault ssh -role otp_key_role -mode otp -strict-host-key-checking=no user@ssh_server"' >> ~/.bashrc
+        #
+        # SSH CRT Method...
+        #
+        vault write ssh/config/ca generate_signing_key=true
+        vault write ssh/roles/user-role @/etc/user-role.json
+        ssh-keygen -t rsa -C "user@ssh_client" -f ~/.ssh/id_rsa -q -N ''
+        echo 'alias sign-cert="vault write -field=signed_key ssh/sign/user-role public_key=@$$HOME/.ssh/id_rsa.pub > ~/.ssh/signed-cert.pub"' >> ~/.bashrc
+        echo 'alias sign-show="ssh-keygen -Lf ~/.ssh/signed-cert.pub"' >> ~/.bashrc
+        echo 'alias ssh_server_crt="sign-cert && sign-show && ssh -o StrictHostKeyChecking=no -i ~/.ssh/signed-cert.pub -i ~/.ssh/id_rsa user@ssh_server"' >> ~/.bashrc
+        #
+        tail -f /dev/null

@@ -1,0 +1,38 @@
+FROM bitnami/minideb 
+
+ENV TERM xterm-256color
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USER=user
+
+# INSTALL GENERIC...
+RUN apt-get clean
+RUN apt-get update 
+RUN apt-get install -y apt-transport-https sudo wget git gnupg2 jq libxml2 moreutils vim lsb-release locales openssh-server unzip curl rsyslog
+
+RUN locale-gen en_US.UTF-8
+RUN update-locale
+
+# PREPARE VAULT-SSH-HELPER
+ENV VAULT_SSH_HELPER_VERSION=0.2.1
+RUN curl -C - -k https://releases.hashicorp.com/vault-ssh-helper/${VAULT_SSH_HELPER_VERSION}/vault-ssh-helper_${VAULT_SSH_HELPER_VERSION}_linux_amd64.zip -o /tmp/vault-ssh-helper.zip
+RUN unzip -d /tmp/ /tmp/vault-ssh-helper.zip && rm /tmp/vault-ssh-helper.zip
+RUN mv /tmp/vault-ssh-helper /usr/local/bin/
+RUN mkdir /etc/vault-ssh-helper.d
+
+# PREPARE SSHD
+RUN mkdir /var/run/sshd \
+    && sed -ie 's/#ListenAddress 0.0.0.0/ListenAddress 0.0.0.0/g' /etc/ssh/sshd_config \
+    && sed -ie 's/#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config \
+    && sed -ie 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config \
+    && sed -ie 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config \
+    && sed -ie 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/g' /etc/ssh/sshd_config \
+    && echo "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem" >> /etc/ssh/sshd_config \
+    && echo "sshd: ALL" >> /etc/hosts.allow \
+    && useradd -m ${USER} --shell /bin/bash \
+    && su - ${USER} -c "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''" \
+    && su - ${USER} -c "touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys" \
+    && sed -ie 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd \
+    && echo "auth requisite pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl" >> /etc/pam.d/sshd \
+    && echo "auth optional pam_unix.so not_set_pass use_first_pass nodelay" >> /etc/pam.d/sshd
+
+CMD ["/usr/sbin/sshd", "-D"]
