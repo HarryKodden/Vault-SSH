@@ -9,6 +9,8 @@ services:
     environment:
       VAULT_ADDR: http://localhost:8200
       VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-test_token}
+    hostname: vault
+    container_name: vault
     ports:
       - 8200:8200
     cap_add:
@@ -20,19 +22,34 @@ services:
       context: ssh
       dockerfile: Dockerfile.server
     hostname: ssh_server
+    container_name: ssh_server
     environment:
       VAULT_ADDR: http://vault:8200
-    volumes:
-      - "./etc/config.hcl:/etc/vault-ssh-helper.d/config.hcl"
     links:
       - vault
     command:
       - /bin/bash
       - -c
       - |
-        sleep 15
+        # Wait for Vault server and Iinitialization of ssh_client
+        sleep 20
+        #
+        # Prepare config for SSH-Helper...
+        #
+        cat << EOF > /etc/vault-ssh-helper.d/config.hcl
+        vault_addr = "$$VAULT_ADDR"
+        ssh_mount_point = "ssh"
+        tls_skip_verify = true
+        allowed_roles = "*"
+        allowed_cidr_list = "0.0.0.0/0"
+        EOF
+        #
+        # Retrieve CA Public key
+        #
+        curl -s $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
+        #
         echo "Starting SSH Server..."
-        curl $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
+        #
         /usr/sbin/sshd -D   
 
   ssh_client:
@@ -40,11 +57,10 @@ services:
       context: ssh
       dockerfile: Dockerfile.client
     hostname: ssh_client
+    container_name: ssh_client
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN:-test_token}
-    volumes:
-      - "./etc/user-role.json:/etc/user-role.json"
     links:
       - vault
       - ssh_server
@@ -52,8 +68,10 @@ services:
       - /bin/bash
       - -c
       - |
+        # Wait for Vault to initialize...
         sleep 5
-        echo "Starting SSH Client..."
+        #
+        echo "Initializing SSH Client..."
         #
         export SSH_SERVER=$$(getent hosts ssh_server | awk '{ print $$1 }')
         #
@@ -68,10 +86,28 @@ services:
         # SSH CRT Method...
         #
         vault write ssh/config/ca generate_signing_key=true
-        vault write ssh/roles/user-role @/etc/user-role.json
+        #
+        cat << EOF > /tmp/user-role.json
+        {
+          "allow_user_certificates": true,
+          "allowed_users": "user",
+          "default_extensions": [
+            {
+              "permit-pty": ""
+            }
+          ],
+          "key_type": "ca",
+          "default_user": "user",
+          "ttl": "2m0s"
+        }
+        EOF
+        #
+        vault write ssh/roles/user-role @/tmp/user-role.json
         ssh-keygen -t rsa -C "user@ssh_client" -f ~/.ssh/id_rsa -q -N ''
         echo 'alias sign-cert="vault write -field=signed_key ssh/sign/user-role public_key=@$$HOME/.ssh/id_rsa.pub > ~/.ssh/signed-cert.pub"' >> ~/.bashrc
         echo 'alias sign-show="ssh-keygen -Lf ~/.ssh/signed-cert.pub"' >> ~/.bashrc
         echo 'alias ssh_server_crt="sign-cert && sign-show && ssh -o StrictHostKeyChecking=no -i ~/.ssh/signed-cert.pub -i ~/.ssh/id_rsa user@ssh_server"' >> ~/.bashrc
+        #
+        echo "SSH Client initialisation ready !"
         #
         tail -f /dev/null
