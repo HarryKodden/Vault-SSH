@@ -3,7 +3,7 @@ Demonstration of SSH using Hashicorp Vault
 
 ## Usage
 
-Start container by:
+Start containers by:
 
 ```
 docker-compose up -d
@@ -32,7 +32,7 @@ docker exec -ti ssh_client bash
 You are now ***user*** inside the ***ssh_client*** container
 From here you can connect to de ***ssh_server*** container via two methods:
 
-1) OTP using Time Time Passwords
+1) OTP using One Time Passwords
    ```
    ssh_server_otp
    ```
@@ -41,7 +41,7 @@ From here you can connect to de ***ssh_server*** container via two methods:
    ssh_server_crt
    ```
 
-It is left as an excercise to inspect the docker-compose.yml file and corresponding dockerfiles to see what this configuration is made of.
+It is left as an excercise to the reader to inspect the **docker-compose.yml** file and corresponding **dockerfiles** to see what this configuration is made of.
 
 
 
