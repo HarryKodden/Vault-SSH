@@ -47,6 +47,7 @@ services:
         # Retrieve CA Public key
         #
         curl -s $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
+        echo "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem" >> /etc/ssh/sshd_config
         #
         echo "Starting SSH Server..."
         #
