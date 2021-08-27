@@ -47,7 +47,7 @@ def pam_sm_authenticate(pamh, flags, argv):
         prompt += ":"
 
     url = "{}/v1/auth/userpass/login/{}".format(
-        config.get("url", "http://localhost:8200"),
+        config.get("vault_addr", "http://localhost:8200"),
         pamh.get_user(None) or DEFAULT_USER
     )
 

@@ -28,11 +28,6 @@ RUN pip install requests
 
 # PREPARE SSHD
 RUN mkdir /var/run/sshd \
-    && sed -ie 's/#ListenAddress 0.0.0.0/ListenAddress 0.0.0.0/g' /etc/ssh/sshd_config \
-    && sed -ie 's/#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config \
-    && sed -ie 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config \
-    && sed -ie 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config \
-    && sed -ie 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/g' /etc/ssh/sshd_config \
     && echo "sshd: ALL" >> /etc/hosts.allow \
     && useradd -m ${USER} --shell /bin/bash \
     && su - ${USER} -c "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''" \

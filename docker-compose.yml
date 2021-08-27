@@ -49,13 +49,23 @@ services:
         # Retrieve CA Public key
         #
         curl -s $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
-        echo "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem" >> /etc/ssh/sshd_config
+        #
+        # Adjust SSH Config...
+        #
+        sed -ie 's/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/g' /etc/ssh/sshd_config
+        #
+        cat << EOF >> /etc/ssh/sshd_config
+        ListenAddress 0.0.0.0
+        PasswordAuthentication no
+        PermitEmptyPasswords no
+        TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem
+        EOF
         #
         # Below section fascilitates both Vault OTP login & Vault UserPass logon
         #
         sed -ie 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd
         cat << EOF >> /etc/pam.d/sshd
-        auth    [success=3 default=ignore]  pam_python.so /usr/local/bin/auth.py url=http://$$VAULT_ADDR nosslverify debug prompt="Vault_Or_Local_Password"
+        auth    [success=3 default=ignore]  pam_python.so /usr/local/bin/auth.py vault_addr=$$VAULT_ADDR nosslverify debug prompt="Vault_Or_Local_Password"
         auth    [success=2 default=ignore]  pam_unix.so nullok_secure
         auth    [success=1 default=ignore]  pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl
         auth    requisite                   pam_deny.so
@@ -122,6 +132,21 @@ services:
         echo 'alias sign-cert="vault write -field=signed_key ssh/sign/user-role public_key=@$$HOME/.ssh/id_rsa.pub > ~/.ssh/signed-cert.pub"' >> ~/.bashrc
         echo 'alias sign-show="ssh-keygen -Lf ~/.ssh/signed-cert.pub"' >> ~/.bashrc
         echo 'alias ssh_server_crt="sign-cert && sign-show && ssh -o StrictHostKeyChecking=no -i ~/.ssh/signed-cert.pub -i ~/.ssh/id_rsa user@ssh_server"' >> ~/.bashrc
+        #
+        #
+        # USERPASS Method...
+        #
+        # Enable UserPass Access Method
+        #
+        vault auth enable userpass
+        #
+        # Add user to Vault with a password of 123456...
+        #
+        curl -s --request POST \
+          --url $${VAULT_ADDR}/v1/auth/userpass/users/user \
+          --header 'Content-Type: application/json' \
+          --header 'X-Vault-Token: '$${VAULT_TOKEN} \
+          --data '{ "password": "123456", "policies": "default"}'
         #
         echo "SSH Client initialisation ready !"
         #
