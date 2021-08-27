@@ -25,6 +25,8 @@ services:
     container_name: ssh_server
     environment:
       VAULT_ADDR: http://vault:8200
+    volumes:
+      - ./auth.py:/usr/local/bin/auth.py
     links:
       - vault
     command:
@@ -49,8 +51,20 @@ services:
         curl -s $$VAULT_ADDR/v1/ssh/public_key > /etc/ssh/trusted-user-ca-keys.pem
         echo "TrustedUserCAKeys /etc/ssh/trusted-user-ca-keys.pem" >> /etc/ssh/sshd_config
         #
+        # Below section fascilitates both Vault OTP login & Vault UserPass logon
+        #
+        sed -ie 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd
+        cat << EOF >> /etc/pam.d/sshd
+        auth    [success=3 default=ignore]  pam_python.so /usr/local/bin/auth.py url=http://$$VAULT_ADDR nosslverify debug prompt="Vault_Or_Local_Password"
+        auth    [success=2 default=ignore]  pam_unix.so nullok_secure
+        auth    [success=1 default=ignore]  pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl
+        auth    requisite                   pam_deny.so
+        auth    required                    pam_permit.so
+        EOF
+        #
         echo "Starting SSH Server..."
         #
+        rsyslogd &
         /usr/sbin/sshd -D   
 
   ssh_client:

@@ -6,8 +6,8 @@ ENV USER=user
 
 # INSTALL GENERIC...
 RUN apt-get clean
-RUN apt-get update 
-RUN apt-get update && apt-get install -y ntp curl unzip ssh sshpass iputils-ping sudo vim
+RUN apt-get update
+RUN apt-get install -y ntp curl unzip ssh sshpass iputils-ping sudo vim
 
 # INSTALL VAULT...
 ENV VAULT_VERSION=1.8.1
@@ -23,4 +23,3 @@ WORKDIR /home/${USER}
 USER ${USER}
 
 CMD ["/bin/bash"]
-

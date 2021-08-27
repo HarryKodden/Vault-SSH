@@ -19,6 +19,13 @@ RUN unzip -d /tmp/ /tmp/vault-ssh-helper.zip && rm /tmp/vault-ssh-helper.zip
 RUN mv /tmp/vault-ssh-helper /usr/local/bin/
 RUN mkdir /etc/vault-ssh-helper.d
 
+# Install PAM_PYTHON
+RUN apt-get install -y libpam-dev python python-pip python-dev
+RUN wget https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/pam-python/1.0.9-2/pam-python_1.0.9.orig.tar.gz
+RUN tar -xzf pam-python* && rm pam-python*.gz
+RUN cd pam-python*/src && make && make install
+RUN pip install requests
+
 # PREPARE SSHD
 RUN mkdir /var/run/sshd \
     && sed -ie 's/#ListenAddress 0.0.0.0/ListenAddress 0.0.0.0/g' /etc/ssh/sshd_config \
@@ -29,9 +36,6 @@ RUN mkdir /var/run/sshd \
     && echo "sshd: ALL" >> /etc/hosts.allow \
     && useradd -m ${USER} --shell /bin/bash \
     && su - ${USER} -c "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''" \
-    && su - ${USER} -c "touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys" \
-    && sed -ie 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd \
-    && echo "auth requisite pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl" >> /etc/pam.d/sshd \
-    && echo "auth optional pam_unix.so not_set_pass use_first_pass nodelay" >> /etc/pam.d/sshd
+    && su - ${USER} -c "touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"
 
 CMD ["/usr/sbin/sshd", "-D"]
