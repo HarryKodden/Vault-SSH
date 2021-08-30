@@ -19,8 +19,8 @@ services:
 
   ssh_server:
     build:
-      context: ssh
-      dockerfile: Dockerfile.server
+      context: build
+      dockerfile: Dockerfile.ssh_server
     hostname: ssh_server
     container_name: ssh_server
     environment:
@@ -63,9 +63,9 @@ services:
         #
         sed -ie 's/@include common-auth/#@include common-auth/g' /etc/pam.d/sshd
         cat << EOF >> /etc/pam.d/sshd
-        auth    [success=3 default=ignore]  pam_python.so /usr/local/bin/vault_pam.py vault_addr=$$VAULT_ADDR nosslverify debug prompt="Vault_Or_Local_Password"
+        auth    [success=3 default=ignore]  pam_python.so /usr/local/bin/vault-pam-helper.py vault_addr=$$VAULT_ADDR nosslverify debug prompt="Vault_Or_Local_Password"
         auth    [success=2 default=ignore]  pam_unix.so nullok_secure
-        auth    [success=1 default=ignore]  pam_exec.so quiet expose_authtok log=/tmp/vaultssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl
+        auth    [success=1 default=ignore]  pam_exec.so quiet expose_authtok log=/tmp/vault-ssh.log /usr/local/bin/vault-ssh-helper -dev -config=/etc/vault-ssh-helper.d/config.hcl
         auth    requisite                   pam_deny.so
         auth    required                    pam_permit.so
         EOF
@@ -77,8 +77,8 @@ services:
 
   ssh_client:
     build:
-      context: ssh
-      dockerfile: Dockerfile.client
+      context: build
+      dockerfile: Dockerfile.ssh_client
     hostname: ssh_client
     container_name: ssh_client
     environment:

@@ -78,7 +78,6 @@ def pam_sm_authenticate(pamh, flags, argv):
         logging(syslog.LOG_ERR, traceback.format_exc())
         logging(syslog.LOG_ERR, "%s: %s" % (__name__, e))
 
-        rval = pamh.PAM_AUTH_ERR
     except requests.exceptions.SSLError:
         logging(syslog.LOG_CRIT, "%s: SSL Validation error. Get a valid "
                                  "SSL certificate, For testing you can use the "

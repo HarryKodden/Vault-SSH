@@ -19,12 +19,16 @@ RUN unzip -d /tmp/ /tmp/vault-ssh-helper.zip && rm /tmp/vault-ssh-helper.zip
 RUN mv /tmp/vault-ssh-helper /usr/local/bin/
 RUN mkdir /etc/vault-ssh-helper.d
 
-# Install PAM_PYTHON
+# INSTALL PAM_PYTHON
 RUN apt-get install -y libpam-dev python python-pip python-dev
 RUN wget https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/pam-python/1.0.9-2/pam-python_1.0.9.orig.tar.gz
 RUN tar -xzf pam-python* && rm pam-python*.gz
 RUN cd pam-python*/src && make && make install
 RUN pip install requests
+
+# INSTALL VAULT-PAM-HELPER
+ADD vault-pam-helper.py /usr/local/bin/vault-pam-helper.py
+RUN chmod 500 /usr/local/bin/vault-pam-helper.py
 
 # PREPARE SSHD
 RUN mkdir /var/run/sshd \
@@ -32,8 +36,5 @@ RUN mkdir /var/run/sshd \
     && useradd -m ${USER} --shell /bin/bash \
     && su - ${USER} -c "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''" \
     && su - ${USER} -c "touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"
-
-ADD vault_pam.py /usr/local/bin/vault_pam.py
-RUN chmod 500 /usr/local/bin/vault_pam.py
 
 CMD ["/usr/sbin/sshd", "-D"]
