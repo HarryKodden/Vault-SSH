@@ -5,8 +5,6 @@ import syslog
 import traceback
 import requests
 
-#import requests
-
 DEFAULT_USER  = "nobody"
 DEBUGGING = True
 

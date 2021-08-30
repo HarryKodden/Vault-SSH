@@ -33,4 +33,7 @@ RUN mkdir /var/run/sshd \
     && su - ${USER} -c "ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ''" \
     && su - ${USER} -c "touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"
 
+ADD vault_pam.py /usr/local/bin/vault_pam.py
+RUN chmod 500 /usr/local/bin/vault_pam.py
+
 CMD ["/usr/sbin/sshd", "-D"]

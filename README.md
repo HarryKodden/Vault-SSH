@@ -32,24 +32,36 @@ docker exec -ti ssh_client bash
 You are now ***user*** inside the ***ssh_client*** container
 From here you can connect to de ***ssh_server*** container via following supported methods:
 
-1) OTP using One Time Passwords
+1) **OTP** using One Time Passwords
    ```
    ssh_server_otp
    ```
-2) CA using SSH Public Keys signed by Vault
+
+   This command is a conveniant alias for:
+   ```
+   vault ssh -role otp_key_role -mode otp -strict-host-key-checking=no user@ssh_server
+   ```
+
+2) **CA** using SSH Public Keys signed by Vault
    ```
    ssh_server_crt
    ```
-3) Local User OR Vault password. 
+   This command is a conveniant alias for:
+   ```
+   sign-cert && ssh -o StrictHostKeyChecking=no -i ~/.ssh/signed-cert.pub -i ~/.ssh/id_rsa user@ssh_server
+   ```
+
+3) **PAM** (Local User OR Vault password) 
    ```
    ssh user@ssh_server
    ```
    When you have a system password on this machine, you get access when your password matches the system password
 
-   If it not matches, the entered password will be verified via Vault if it matches the password that is assigned in Vault to your UserPass Access Method. When that is valid, you get access as well
+   If password not matches, the entered password will be verified via Vault if it matches the password that is assigned in Vault to your UserPass Access Method. When that is valid, you get access as well (off course you are free to change order of the module to prioritize the method to be evaluated first, refer: **/etc/pam.d/sshd**)
+   <br/>
 
-4) [ Old School ] Public Key Access
-    Have you public key stored into the 'Authorized Keys' file on the ssh_server
+4) [ Old School ] **Public Key Access**
+    Have you public key stored into the ***~/.ssh/authorized_keys*** file on the ssh_server
 
 It is left as an excercise to the reader to inspect the **docker-compose.yml** file and corresponding **dockerfiles** to see what this configuration is made of.
 
